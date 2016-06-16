@@ -1,0 +1,1 @@
+S0types	S1report	B-cells	Monocytes	Neutrophils	Basophils	Eosinophils	T-cells	NK cellsB-cells	1	1	0	0	0	0	0	0Basophils	1	0	0	0	1	0	0	0Eosinophils	1	0	0	0	0	1	0	0Granulocytes	0	0	0	0.96	0.02	0.02	0	0Monocytes	1	0	1	0	0	0	0	0Neutrophils	1	0	0	1	0	0	0	0NK cells	1	0	0	0	0	0	0	1T-cells	1	0	0	0	0	0	1	0

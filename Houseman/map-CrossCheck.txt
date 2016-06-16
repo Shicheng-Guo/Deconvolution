@@ -1,0 +1,1 @@
+B-cells	B-cellsBasophils	BasophilsEosinophils	EosinophilsMonocytes	MonocytesNeutrophils	NeutrophilsNK cells	NK cellsT-cells	T-cellsGranulocytes	Neutrophils
