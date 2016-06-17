@@ -1,19 +1,14 @@
+
 library("DeconRNASeq")
-n=100  # number of mixture samples
 k=11   # 11 reference tissue
 s=3    # each tissue own 3 samples
-p=1000 # number of tissue specific probe
+p=30   # number of tissue specific probe for each tissue
 signatures<-c()
 tissue=c("Brain","CCT","Colon","Esophagus","Heart","Intestine","Kidney","Liver","Lung","Stomach","WBC")
 
+signatures<-abs(matrix(rnorm(p*k*s,0.1,0.1),p*k,k*s))
 for(i in 1:k){
-  mc=sample(c(0.1,0.8),1)
-  c.tmp<-c()
-  for(j in 1:s){
-   c<-matrix(abs(rnorm(p,mc,mc)),p)   
-   c.tmp<-cbind(c.tmp,c)
-  }
-  signatures<-cbind(signatures,c.tmp)
+  signatures[(p*(i-1)+1):(p*i),(s*(i-1)+1):(s*i)]=matrix(rnorm(p*s,0.9,0.1),p,s) 
 }
 signatures[signatures>1]<-1
 colnames(signatures)=rep(tissue,each=3)
@@ -21,7 +16,8 @@ rownames(signatures)=paste("cg00",1:nrow(signatures),sep="")
 
 barplot(colMeans(signatures))
 barplot(rowMeans(signatures))
-
+heatmap(signatures,Rowv=NA,Colv=NA)
+? heatmap
 gsi<-data.frame(GSI(signatures))
 group<-as.character(unique(gsi$group))
 
@@ -54,9 +50,14 @@ VirtualMatrix=data.frame(DeconData[,grep("VM",colnames(DeconData))])
 Signatures=data.frame(DeconData[,-grep("VM",colnames(DeconData))])
 Rlt<-DeconRNASeq(VirtualMatrix,Signatures, checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
 rlt<-Rlt$out.all
+output<-data.frame(CCTInput=seq(0,1,by=0.05),rlt)
+plot(output[,1],output[,3])
+
+fit=lm(CCTInput~CCT,data=output)
+plot(fit)
 
 cibersortFilePrep(VirtualMatrix,signaturesCS,"simulation")
-
+signaturesCS[1:10,1:10]
 cibersortFilePrep<-function(VirtualMatrix,signaturesCS,prefix){
 DeconDataCibersort<-data.frame(VirtualMatrix,signaturesCS)
 VirtualMatrixCibersort=VirtualMatrix
@@ -66,15 +67,16 @@ mixture.output<-paste(prefix,".mixture.inp.txt",sep="")
 label.output<-paste(prefix,".lab.inp.txt",sep="")
 base=unlist(lapply(strsplit(colnames(SignaturesCibersort),"[.]"),function(x) x[[1]]))
 label<-matrix(2,nrow=length(unique(base)),ncol=ncol(SignaturesCibersort))
+colnames(SignaturesCibersort)=base
 rownames(label)=unique(base)
 for(i in 1:nrow(label)){
   label[i,grep(unique(base)[i],colnames(SignaturesCibersort))]<-1
 }
 colnames(label)=unlist(lapply(strsplit(colnames(SignaturesCibersort),"[.]"),function(x) x[[1]]))
 
-write.table(label,file=label.output,sep="\t",row.names=T,col.names=NA,quote=F)
-write.table(SignaturesCibersort,file=signature.output,col.names=NA,row.names=T,sep="\t",quote=F)
-write.table(VirtualMatrix,file=mixture.output,sep="\t",row.names=T,col.names=NA,quote=F)
+write.table(label,file=label.output,sep="\t",row.names=T,col.names=F,quote=F)
+write.table(100*SignaturesCibersort,file=signature.output,col.names=NA,row.names=T,sep="\t",quote=F)
+write.table(100*VirtualMatrix,file=mixture.output,sep="\t",row.names=T,col.names=NA,quote=F)
 }
 
 
@@ -174,7 +176,9 @@ cibersortFilePrep<-function(Signature,GSIObject,prefix){
   print(paste("Cibersort label input:",label.output,sep=" "))
 }
 
-
+mix="simulation.mixture.inp.txt"
+pure="simulation.signature.inp.txt"
+class="simulation.lab.inp.txt"
 options("scipen"=100, "digits"=4)
 args <- commandArgs(trailingOnly = TRUE)
 pure=args[1]
@@ -182,7 +186,7 @@ mix=args[2]
 class=args[3]
 A = read.table(pure,T,row=1)
 B = read.table(mix,T,row=1)
-C = read.table(class,F,row=1)
+C = read.table(class,T,row=1)
 A = A*100
 B = B*100
 for( i in 1:nrow(C) ){
