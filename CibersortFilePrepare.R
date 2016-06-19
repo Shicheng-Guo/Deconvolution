@@ -6,8 +6,8 @@ class=args[3]
 A = read.table(pure,T,row=1)
 B = read.table(mix,T,row=1)
 C = read.table(class,F,row=1)
-A = A*100
-B = B*100
+A = A # *100
+B = B # *100
 for( i in 1:nrow(C) ){
         cur_ref = which(C[i,]==1)
         average_values = apply(A[,cur_ref],1,function(x) mean(x,na.rm=T))
