@@ -48,160 +48,33 @@ dim(VirtualMatrix)
 DeconData<-data.frame(VirtualMatrix,signaturesQR)
 VirtualMatrix=data.frame(DeconData[,grep("VM",colnames(DeconData))])
 Signatures=data.frame(DeconData[,-grep("VM",colnames(DeconData))])
-Rlt<-DeconRNASeq(VirtualMatrix,Signatures, checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+
+library("car")
+library("DeconRNASeq")
+plot(density(as.numeric(unlist(VirtualMatrix))))
+plot(density(as.numeric(unlist(logit(VirtualMatrix)))))
+
+VirtualMatrix=logit(VirtualMatrix)
+Signatures=logit(Signatures)
+Rlt<-DeconRNASeq(VirtualMatrix, Signatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
 rlt<-Rlt$out.all
 output<-data.frame(CCTInput=seq(0,1,by=0.05),rlt)
 plot(output[,1],output[,3])
-
-fit=lm(CCTInput~CCT,data=output)
-plot(fit)
-
-cibersortFilePrep(VirtualMatrix,signaturesCS,"simulation")
-signaturesCS[1:10,1:10]
-cibersortFilePrep<-function(VirtualMatrix,signaturesCS,prefix){
-DeconDataCibersort<-data.frame(VirtualMatrix,signaturesCS)
-VirtualMatrixCibersort=VirtualMatrix
-SignaturesCibersort=signaturesCS
-signature.output<-paste(prefix,".signature.inp.txt",sep="")
-mixture.output<-paste(prefix,".mixture.inp.txt",sep="")
-label.output<-paste(prefix,".lab.inp.txt",sep="")
-base=unlist(lapply(strsplit(colnames(SignaturesCibersort),"[.]"),function(x) x[[1]]))
-label<-matrix(2,nrow=length(unique(base)),ncol=ncol(SignaturesCibersort))
-colnames(SignaturesCibersort)=base
-rownames(label)=unique(base)
-for(i in 1:nrow(label)){
-  label[i,grep(unique(base)[i],colnames(SignaturesCibersort))]<-1
-}
-colnames(label)=unlist(lapply(strsplit(colnames(SignaturesCibersort),"[.]"),function(x) x[[1]]))
-
-write.table(label,file=label.output,sep="\t",row.names=T,col.names=F,quote=F)
-write.table(100*SignaturesCibersort,file=signature.output,col.names=NA,row.names=T,sep="\t",quote=F)
-write.table(100*VirtualMatrix,file=mixture.output,sep="\t",row.names=T,col.names=NA,quote=F)
-}
+lines(x = c(0,1), y = c(0,1))
+plot(output[,1],output[,3]-output[,1],xlab="Simulated contribution (%)",ylab="Prediction error (%)",pch=19,cex=2,col="blue",lty=2)
 
 
-# Simulation for 3 componment
-VirtualMatrix<-c()
-for(F1 in seq(0,0.5,by=0.05)){
-  VirtualSample<-F1/2*(signatures[,grep("CCT",colnames(signatures))])+F1/2*(signatures[,grep("Colon",colnames(signatures))])+(1-F1)*(signatures[,grep("WB",colnames(signatures))])
-  VirtualMatrix<-cbind(VirtualMatrix,VirtualSample)
-}
-VirtualMatrix<-data.frame(VirtualMatrix)
-colnames(VirtualMatrix)=paste("VM",seq(0,0.5,by=0.01),sep="")
-
-DeconData<-data.frame(VirtualMatrix,signatures)
-VirtualMatrix=data.frame(DeconData[,grep("VM",colnames(DeconData))])
-Signatures=data.frame(DeconData[,-grep("VM",colnames(DeconData))])
-Rlt<-DeconRNASeq(VirtualMatrix,Signatures, checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
-rlt<-Rlt$out.all
-rlt
-
-
-library("DeconRNASeq")
-n=100
-k=11
-signatures<-matrix(abs(rnorm(n*k,0.1,0.1)),n,k)
-colnames(signatures)=c("Brain","CCT","Colon","Esophagus","Heart","Intestine","Kidney","Liver","Lung","Stomach","WBC")
-VirtualMatrix<-c()
-for(F1 in seq(0,0.5,by=0.05)){
-  VirtualSample<-F1/2*(signatures[,grep("CCT",colnames(signatures))])+F1/2*(signatures[,grep("Colon",colnames(signatures))])+(1-F1)*(signatures[,grep("WB",colnames(signatures))])
-  VirtualMatrix<-cbind(VirtualMatrix,VirtualSample)
-}
-VirtualMatrix<-data.frame(VirtualMatrix)
-colnames(VirtualMatrix)=paste("VM",seq(0,0.5,by=0.05),sep="")
-
-DeconData<-data.frame(VirtualMatrix,signatures)
-VirtualMatrix=data.frame(DeconData[,grep("VM",colnames(DeconData))])
-Signatures=data.frame(DeconData[,-grep("VM",colnames(DeconData))])
-Rlt<-DeconRNASeq(VirtualMatrix,Signatures, checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
-rlt<-Rlt$out.all
-rlt
-
-
-```{r, echo=FALSE}
-AverageWithGroup<-function(data){
-  # average the MHL matrix for each row based on tissue of basement
-  base=unlist(lapply(strsplit(colnames(data),"[.]"),function(x) x[[1]]))
-  matrix=apply(data,1,function(x) tapply(x,base,function(x) mean(x,na.rm=T)))
-  matrix<-t(matrix)
-  rownames(matrix)=rownames(data)
-  matrix<-matrix[!rowSums(!is.finite(matrix)),]
-  return(matrix)
-}
-
-
-GSI<-function(data){
-  data<-data.matrix(data)
-  group=names(table(colnames(data)))
-  index=colnames(data)
-  gsi<-c()
-  gmaxgroup<-c()
-  for(i in 1:nrow(data)){
-    gsit<-0
-    gmax<-names(which.max(tapply(as.numeric(data[i,]),index,function(x) mean(x,na.rm=T))))
-    for(j in 1:length(group)){
-      tmp<-(1-10^(mean(data[i,][which(index==group[j])],na.rm=T))/10^(mean(data[i,][which(index==gmax)],,na.rm=T)))/(length(group)-1)
-      gsit<-gsit+tmp
-    }
-    gmaxgroup<-c(gmaxgroup,gmax)
-    gsi<-c(gsi,gsit)
-  }
-  rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi)
-  return(rlt)
-}
-
-cibersortFilePrep<-function(Signature,GSIObject,prefix){
-  data1_ref=Signature
-  rlt=GSIObject
-  signature.output<-paste(prefix,".signature.inp.txt",sep="")
-  mixture.output<-paste(prefix,".mixture.inp.txt",sep="")
-  label.output<-paste(prefix,".lab.inp.txt",sep="")
-  
-  signaturesCibersort<-data1_ref[match(rlt[,1],rownames(data1_ref)),]
-  write.table(signaturesCibersort,file=signature.output,col.names=NA,row.names=T,sep="\t",quote=F)
-  write.table(DeconData.tmp,file=mixture.output,sep="\t",row.names=T,col.names=NA,quote=F)
-  base=unlist(lapply(strsplit(colnames(signaturesCibersort),"[.]"),function(x) x[[1]]))
-  label<-matrix(2,nrow=length(unique(base)),ncol=ncol(signaturesCibersort))
-  rownames(label)=unique(base)
-  for(i in 1:nrow(label)){
-    label[i,grep(unique(base)[i],colnames(signaturesCibersort))]<-1
-  }
-  colnames(label)=colnames(signaturesCibersort)
-  write.table(label,file=label.output,sep="\t",row.names=T,col.names=NA,quote=F)
-  dim(signaturesCibersort)
-  dim(label)
-  print("Cibersort input successfully created")
-  print(paste("Cibersort Signature input:",signature.output,sep=" "))
-  print(paste("Cibersort Mixture input:",mixture.output,sep=" "))
-  print(paste("Cibersort label input:",label.output,sep=" "))
-}
-
-mix="simulation.mixture.inp.txt"
-pure="simulation.signature.inp.txt"
-class="simulation.lab.inp.txt"
-options("scipen"=100, "digits"=4)
-args <- commandArgs(trailingOnly = TRUE)
-pure=args[1]
-mix=args[2]
-class=args[3]
-A = read.table(pure,T,row=1)
-B = read.table(mix,T,row=1)
-C = read.table(class,T,row=1)
-A = A*100
-B = B*100
-for( i in 1:nrow(C) ){
-  cur_ref = which(C[i,]==1)
-  average_values = apply(A[,cur_ref],1,function(x) mean(x,na.rm=T))
-  for( j in 1:nrow(A) ){
-    na_pos = which(is.na(A[j,]) & C[i,]==1)
-    A[j, na_pos] = average_values[j]
-  }
-}
-write.table(cbind(data.frame(probe_id=rownames(A)), A), file=paste(pure,".mod",sep=""), quote=F,sep="\t",row=F)
-write.table(cbind(data.frame(probe_id=rownames(B)), B), file=paste(mix,".mod",sep=""), quote=F,sep="\t",row=F)
-
-
-```
-
-
-
+# Figure parepartion
+library("ggplot2")
+Fig<-data.frame(seq(0,1,by=0.05),Rlt$out.all[,grep("CCT",colnames(Rlt$out.all))],Rlt$out.all[,grep("WB",colnames(Rlt$out.all))])
+colnames(Fig)<-c("Simulated","CCT","WB")
+Fig<-100*Fig
+c <- ggplot(Fig, aes(Simulated,CCT))
+c <- c + xlab("Simulated contribution (%)")+ylab("Predicted contribution (%)")
+c <- c + stat_smooth(se = TRUE,n=10,size=1.5) + geom_point(size=3)
+c <- c + stat_smooth(se = TRUE,n=10,size=1.5) + geom_point(size=3)
+c <- c + theme_bw()
+c <- c + theme(axis.text=element_text(size=10), axis.title=element_text(size=14,face="bold"))
+print(c)
+ggsave(c,file="coloncancer-deconvolution.simultaion-2.pdf")
+abline()
