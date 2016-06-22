@@ -1,8 +1,10 @@
-Lungcancerdatapre<-function(){
+Coloncancerdatapre<-function(){
   rlt<-list()
   setwd("/home/shg047/oasis/monod/hapinfo/")
   saminfo<-read.table("/home/shg047/oasis/monod/saminfo.txt",sep="\t")
-  data<-read.table("/home/shg047/oasis/monod/hapinfo/monod.mhl.may5.txt",head=T,sep="\t",row.names=1,as.is=T,check.names=F)
+  # data<-read.table("/home/shg047/oasis/monod/hapinfo/monod.mhl.may5.txt",head=T,sep="\t",row.names=1,as.is=T,check.names=F)
+  # save(data,file="monod.mhl.may5.txt.RData")
+  load("monod.mhl.may5.txt.RData")
   data<-data[,-grep("CTT-|PC-P|PC-T",colnames(data))]
   colnames(data)[grep("STL",colnames(data))]<-as.character(saminfo[match(colnames(data)[grep("STL",colnames(data))],saminfo[,1]),2])
   colnames(data)[grep("WB",colnames(data))]<-"WBC"
@@ -13,8 +15,8 @@ Lungcancerdatapre<-function(){
   colnames(data)[grep("6-P-",colnames(data))]<-"CCP"
   colnames(data)[grep("7-P-",colnames(data))]<-"LCP"
   colnames(data)[grep("NC-P-",colnames(data))]<-"NCP"
-  data1<-data[,grep("Brain|Stomach|Lung|Heart|Colon|LCT|WBC|Liver|Esophagus|Kidney|LCP",colnames(data))]
-  data1_ref<-data1[,-(grep("LCP",colnames(data1)))]
+  data1<-data[,grep("Brain|Stomach|Lung|Heart|Colon|WBC|Intestine|Liver|Esophagus|Kidney|CCP|CCT",colnames(data))]
+  data1_ref<-data1[,-(grep("CCP",colnames(data1)))]
   base=unlist(lapply(strsplit(colnames(data1_ref),"[.]"),function(x) x[[1]]))
   colnames(data1_ref)<-base
   gsi<-data.frame(GSIMethDecon(data1_ref))
@@ -26,7 +28,6 @@ Lungcancerdatapre<-function(){
   rlt$signature<-signatures
   return(rlt)
 }
-
 
 GSIMethDecon<-function(data){
   data<-data.matrix(data)
@@ -45,11 +46,9 @@ GSIMethDecon<-function(data){
     gsi<-c(gsi,gsit)
     avebase<-rbind(avebase,ave)
   }
-  rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi,AVE=avebase)
-  rlt<-rlt[-which(rlt[,2]!="WBC" & rlt[,grep("WBC",colnames(rlt))]>0.01),]
+  rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi,avebase)
   return(rlt)
 }
-
 
 AverageWithGroup<-function(data){
   base=unlist(lapply(strsplit(colnames(data),"[.]"),function(x) x[[1]]))
@@ -69,17 +68,36 @@ RandomSamplingMean<-function(data,number=round(ncol(data)/2)){
   rlt
 }
 
-TopGSIByCategory<-function(gsi,top=20){
+TopGSIByCategory<-function(gsi,top=2,thresHigh=0.3,thresLow=0.1,plotfigure=F,figprefix="tissuespecific"){
   GSIRlt<-c()
+  group<-as.character(unique(gsi$group))
   rank<-c(rep(top,length(group)))
+  otf1<-paste(figprefix,"boxplot.pdf",sep="")
+  otf2<-paste(figprefix,"heatmap.pdf",sep="")
+  parnum<-ceiling(sqrt(length(group)))
+  pdf(otf1)
+  par(mfrow=c(parnum,parnum),oma = c(2,2,2,2) + 0.1,mar = c(2,2,2,2) + 0.1,cex.axis=0.75, cex.lab=0.75)
   for (i in 1:length(group)){
     subset=gsi[which(gsi$group==group[i]),]
+    rexclhigh<-which(apply(subset,1,function(x) x[grep(group[i],colnames(gsi))]<0.2))
+    xx<-subset[,-grep(group[i],colnames(gsi))]
+    rexcllow<-which(apply(xx,1,function(x) any(as.numeric(x[4:length(x)])>0.1)))
+    rexcl<-c(rexclhigh,rexcllow)
+    subset=subset[-rexcl,]
     subset=subset[order(subset[,3],decreasing=T)[1:rank[i]],]
     GSIRlt<-rbind(GSIRlt,subset)
+    if(plotfigure==T){
+      zz=subset[which(subset$group==group[i]),]
+      boxplot(zz[,4:ncol(zz)],horizontal=T,las=2,col="red")
+    }
+  }
+  dev.off()
+  
+  if(plotfigure==T){
+    HeatMap(data=data.matrix(subset[,4:ncol(subset)]),phen=gsub("AVE.","",colnames(subset)[4:ncol(subset)]),figure=otf2)
   }
   return(GSIRlt)
 }
-
 
 DataExtractionTrim<-function(data){
   data<-data[,-grep("CTT-|PC-P|PC-T",colnames(data))]
@@ -94,6 +112,23 @@ DataExtractionTrim<-function(data){
   colnames(data)[grep("NC-P-",colnames(data))]<-"NCP"
   data1<-data[,grep("Brain|Stomach|Lung|Heart|Colon|CCT|WBC|Liver|Esophagus|Kidney|Intestine|CCP",colnames(data))]
   return(data1)
+}
+
+HeatMap<-function(data,phen,figure="heatmap.pdf",cexRow = 0.01,cexCol = 1.2,Colv=T,Rowv=T){
+  library("gplots")
+  colnames(data)=phen
+  colors <- colorpanel(75,"midnightblue","mediumseagreen","yellow") 
+  colors <-bluered(75)
+  colors <-greenred(75)
+  sidecol<-function(x){
+    x<-as.numeric(as.factor(x))
+    col<-rainbow(length(table(colnames(data))))
+    sapply(x,function(x) col[x])
+  }
+  ColSideColors=sidecol(phen)
+  pdf(figure)
+  heatmap.2(data,trace="none",cexRow = cexRow,cexCol = cexCol, ColSideColors=ColSideColors,density.info="none",col=colors,Colv=Colv,Rowv=Rowv,keysize=0.9, margins = c(5, 10))
+  dev.off()
 }
 
 FigurePrepareSimulation<-function(){
@@ -126,16 +161,16 @@ ci95<-function(x){
   return(out)
 }
 
-
+outputprefix="Coloncancer.plasma.0.05.top100"
 library("DeconRNASeq")
 library("ggplot2")
-
-Colon<-Lungcancerdatapre()
+Colon<-Coloncancerdatapre()
+save(Colon,file=paste(outputprefix,".input.RData",sep=""))
 data1=Colon$data
 data1_ref=Colon$ref
 signatures<-AverageWithGroup(data1_ref)  
-topgsi<-TopGSIByCategory(Colon$GSI,top=50)
-VirtualMatrix<-data.frame(RandomSamplingMean(data1[,grep("LCP",colnames(data1))]))
+topgsi<-TopGSIByCategory(Colon$GSI,top=100,thresHigh=0.3,thresLow=0.1,plotfigure=F,figprefix=outputprefix)
+VirtualMatrix<-data.frame(RandomSamplingMean(data1[,grep("CCP",colnames(data1))]))
 VirtualMatrix<-VirtualMatrix[-which(! is.finite(rowSums(VirtualMatrix))),]
 head(VirtualMatrix)
 # Deconvolution-QR
@@ -149,7 +184,7 @@ NewSignatures=logit(Signatures)
 head(NewVirtualMatrix)
 head(NewSignatures)
 Rlt<-DeconRNASeq(NewVirtualMatrix,NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
-write.table(Rlt$out.all,file="Realdata-Lung-updateGSI.deconvolution.txt",sep="\t",quote=F,col.names=NA,row.names=T)
-save.image(file="Lung.cancer.updateGSI0.01.RData")
-
+output=rbind(ci95(Rlt$out.all),colMeans(Rlt$out.all),tt)
+write.table(output,file=paste(outputprefix,".deconvolution.result.txt",sep=""),sep="\t",quote=F,col.names=NA,row.names=T)
+save.image(file=outputprefix,"workspace.image.RData")
 
