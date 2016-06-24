@@ -1,0 +1,14 @@
+#!/bin/csh
+#PBS -q hotel
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=8:00:00
+#PBS -o Wcmix.0.1.log
+#PBS -e Wcmix.0.1.err
+#PBS -V
+#PBS -M shihcheng.guo@gmail.com
+#PBS -m abe
+#PBS -A k4zhang-group
+cd /oasis/tscc/scratch/shg047/monod/hapinfo/MergeHapinfo/case
+perl ../randomSampleFromHaploInfo.pl 138611 ../6-T-Merge.hapinfo.txt > 6T.0.1.txt
+perl ../randomSampleFromHaploInfo.pl 22365018 ../WB.hapinfo.merge > WB.0.1.txt
+cat WB.0.1.txt 6T.0.1.txt > Wcmix.0.1.hapinfo
